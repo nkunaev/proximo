@@ -1946,9 +1946,10 @@ pve_guest_config_revert.
 
 MUTATION: migrate a guest to a different node. Dry-run by default — the PLAN shows the
 guest's live state, the source→target, and the honest blast radius (LXC 'online' is
-stop→move→start, NOT zero-downtime; QEMU live migration requires shared storage).
-confirm=True to execute. Async — returns a task UPID; poll with pve_task_status. To drive
-the same move through PDM instead, use pdm_pve_lxc_migrate or pdm_pve_qemu_migrate.
+stop→move→start, NOT zero-downtime; a QEMU disk on local storage is copied only with
+with_local_disks, and the PLAN names and sizes each copy). confirm=True to execute.
+Async — returns a task UPID; poll with pve_task_status. To drive the same move through PDM
+instead, use pdm_pve_lxc_migrate or pdm_pve_qemu_migrate.
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -1956,7 +1957,11 @@ the same move through PDM instead, use pdm_pve_lxc_migrate or pdm_pve_qemu_migra
 | `target` | string | yes | Destination node name to migrate the guest to. |
 | `kind` | string | no | Guest type: 'lxc' or 'qemu'. (default: `"lxc"`) |
 | `node` | string (nullable) | no | Source node name; defaults to the configured node. (default: `null`) |
-| `online` | boolean | no | QEMU: live migration (zero-downtime, needs shared storage). LXC: stop-move-start restart migration (real downtime). False = offline migration. (default: `false`) |
+| `online` | boolean | no | QEMU: live migration (the guest keeps running; local disks also need with_local_disks). LXC: stop-move-start restart migration (real downtime). False = offline migration. (default: `false`) |
+| `with_local_disks` | boolean | no | QEMU only: copy disks on local (non-shared) storage to the target as part of the migration, live or offline. Without it PVE refuses a guest with a local disk. (default: `false`) |
+| `targetstorage` | string (nullable) | no | Where copied local disks land on the target: '1' (same storage ID), one storage ID for all, or 'src:dst' pairs comma-separated. QEMU 'targetstorage', LXC 'target-storage'. (default: `null`) |
+| `bwlimit` | integer (nullable) | no | Migration bandwidth cap in KiB/s; 0 = no cap. Omit to use the datacenter/storage default. (default: `null`) |
+| `migration_type` | string (nullable) | no | QEMU only: 'secure' (SSH tunnel) or 'insecure' (unencrypted, trusted networks only). Omit to use the datacenter default. (default: `null`) |
 | `confirm` | boolean | no | False (default) returns a dry-run PLAN only; True executes the migration. (default: `false`) |
 
 #### `pve_guest_power`

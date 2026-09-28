@@ -378,6 +378,33 @@ def test_guest_migrate_confirm_forwards_online_param_by_kind_and_records(
     assert entry["detail"]["confirmed"] is True
 
 
+def test_guest_migrate_confirm_forwards_local_disk_options_in_wire_form(tmp_path, monkeypatch):
+    """The local-disk knobs reach api._post under PVE's own (hyphenated) names, next to online."""
+    _, api, _, log = _wire(tmp_path, monkeypatch)
+
+    out = server.pve_guest_migrate(vmid="500", target="node2", kind="qemu", online=True,
+                                   with_local_disks=True, targetstorage="local-lvm:fast",
+                                   bwlimit=204800, migration_type="insecure", confirm=True)
+
+    assert out["status"] == "submitted"
+    assert api.posts[-1] == ("/nodes/pve/qemu/500/migrate", {
+        "target": "node2", "online": 1, "with-local-disks": 1, "targetstorage": "local-lvm:fast",
+        "bwlimit": 204800, "migration_type": "insecure",
+    })
+    assert _confirmed_entry(log, "pve_guest_migrate", "submitted")["detail"]["confirmed"] is True
+
+
+def test_guest_migrate_plan_with_local_disks_posts_nothing(tmp_path, monkeypatch):
+    _, api, _, _ = _wire(tmp_path, monkeypatch)
+
+    out = server.pve_guest_migrate(vmid="500", target="node2", kind="qemu", online=True,
+                                   with_local_disks=True)
+
+    assert out["status"] == "plan"
+    assert "with-local-disks=1" in out["change"]
+    assert api.posts == []
+
+
 # ---------------------------------------------------------------------------
 # pve_node_hosts_set / pve_node_dns_set / pve_node_startall — typed-method captures (pve_node.py
 # calls api.node_hosts_set/node_dns_set/node_startall directly, not through the generic verbs).
