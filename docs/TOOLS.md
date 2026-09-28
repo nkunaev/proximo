@@ -4,12 +4,12 @@ The complete external interface of Proximo **v0.44.0**: every MCP tool it expose
 
 **Interface conventions.** Proximo speaks the [Model Context Protocol](https://modelcontextprotocol.io); each tool is also self-describing at runtime over the standard `tools/list` method. **Inputs** are the typed parameters listed per tool below. **Output** is a structured JSON result: read tools return the requested data; every mutating tool first returns a **PLAN** preview (the action and its blast radius) rather than acting, and each call is recorded in the tamper-evident audit ledger. Which tools are registered depends on `PROXIMO_SURFACES` and whether the opt-in exec/agent edges are enabled; this reference lists the **full** catalog.
 
-**924 tools** across 7 surfaces.
+**925 tools** across 7 surfaces.
 
 ## Contents
 
 - [Proxmox VE — in-guest agent (opt-in)](#proxmox-ve--in-guest-agent-opt-in) — 6
-- [Proxmox VE (PVE)](#proxmox-ve-pve) — 307
+- [Proxmox VE (PVE)](#proxmox-ve-pve) — 308
 - [Proxmox Backup Server (PBS)](#proxmox-backup-server-pbs) — 259
 - [Proxmox Mail Gateway (PMG)](#proxmox-mail-gateway-pmg) — 295
 - [Proxmox Datacenter Manager (PDM)](#proxmox-datacenter-manager-pdm) — 45
@@ -1963,6 +1963,23 @@ instead, use pdm_pve_lxc_migrate or pdm_pve_qemu_migrate.
 | `bwlimit` | integer (nullable) | no | Migration bandwidth cap in KiB/s; 0 = no cap. Omit to use the datacenter/storage default. (default: `null`) |
 | `migration_type` | string (nullable) | no | QEMU only: 'secure' (SSH tunnel) or 'insecure' (unencrypted, trusted networks only). Omit to use the datacenter default. (default: `null`) |
 | `confirm` | boolean | no | False (default) returns a dry-run PLAN only; True executes the migration. (default: `false`) |
+
+#### `pve_guest_migrate_preflight`
+
+READ-ONLY: Proxmox's own migration precondition for a guest: which nodes it may go to
+(allowed_nodes / not_allowed_nodes, with the reason, e.g. unavailable storages), its local
+disks and local resources (passthrough, local ISO, ...), and whether it is running.
+
+No state change. The PVE-computed answer that pve_guest_migrate's PLAN estimates from
+storage.cfg; call it before a migrate to see the same refusal PVE would give. Needs
+VM.Migrate on the guest (PVE gates this read behind it; a VM.Audit-only token gets 403).
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `vmid` | string | yes | Numeric VMID/CTID of the guest to check. |
+| `kind` | string | no | Guest type: 'lxc' or 'qemu'. (default: `"lxc"`) |
+| `node` | string (nullable) | no | Node the guest is on; defaults to the configured node. (default: `null`) |
+| `target` | string (nullable) | no | Destination node to check against. Omit for the verdict on every node. (default: `null`) |
 
 #### `pve_guest_power`
 

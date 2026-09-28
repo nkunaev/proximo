@@ -191,6 +191,9 @@ ADVERSARIAL_TOOLS: frozenset[str] = frozenset(
         "proximo_wiki_read",
         "pve_guest_config_get",
         "pve_cluster_resources",
+        # local_disks / local_resources carry volids and ISO names, which are free text chosen by
+        # whoever uploaded or imported them (the same reason pve_storage_content sits here)
+        "pve_guest_migrate_preflight",
         "pve_snapshot_list",
         "pve_backup_freshness",  # embeds guest names (free text) in verdicts/flags
         "pve_storage_content",

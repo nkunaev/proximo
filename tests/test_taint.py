@@ -78,6 +78,7 @@ _EXPECTED_ADVERSARIAL = frozenset(
         "proximo_wiki_read",
         "pve_guest_config_get",
         "pve_cluster_resources",
+        "pve_guest_migrate_preflight",
         "pve_snapshot_list",
         "pve_backup_freshness",  # embeds guest names (free text) in verdicts/flags
         "pve_storage_content",

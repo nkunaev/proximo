@@ -912,6 +912,7 @@ _READ_ONLY_TOOLS = frozenset(
         "pve_file_restore_list",
         "pbs_catalog_list",  # file-level restore: listings inside a backup
         "proximo_api_get",  # the raw GET door: GET-only by construction (tree-validated before the wire)
+        "pve_guest_migrate_preflight",  # GET .../migrate: PVE's precondition verdict, nothing moves
         "pdm_user_get",
         "pdm_user_tokens_list",
         "pdm_user_token_get",

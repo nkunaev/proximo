@@ -51,7 +51,7 @@ The comparison isn't Proximo vs. the GUI. It's **Proximo vs. handing an LLM your
 <summary><b>Verify in 60 seconds</b>: three receipts, no trust required</summary>
 
 ```bash
-# 1. The tool count is real. Ask the server itself, cold (=> 924).
+# 1. The tool count is real. Ask the server itself, cold (=> 925).
 #    (in a clone of this repo, after `uv sync`)
 uv run python -c "import asyncio; from proximo import server; \
 print(len(asyncio.run(server.mcp.list_tools())))"
@@ -73,8 +73,8 @@ vendor. Demand them everywhere.
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/john-broadway/proximo/main/docs/brand/proximo-architecture-dark-b2d87987.svg">
-    <img alt="Proximo architecture: MCP clients (stdio and Streamable HTTP), A2A, and HTTP/OpenAPI clients all land on one governed spine, pass the six-pillar trust spine (PLAN, PROVE, UNDO, DIAGNOSE standing by default; CONSENT and CONTAIN yours to raise), sit on the Proxmox-enforced token floor, and reach four products — PVE, PBS, PMG, PDM" src="https://raw.githubusercontent.com/john-broadway/proximo/main/docs/brand/proximo-architecture-light-cd1a0a42.svg" width="860">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/john-broadway/proximo/main/docs/brand/proximo-architecture-dark-f84ffb5a.svg">
+    <img alt="Proximo architecture: MCP clients (stdio and Streamable HTTP), A2A, and HTTP/OpenAPI clients all land on one governed spine, pass the six-pillar trust spine (PLAN, PROVE, UNDO, DIAGNOSE standing by default; CONSENT and CONTAIN yours to raise), sit on the Proxmox-enforced token floor, and reach four products — PVE, PBS, PMG, PDM" src="https://raw.githubusercontent.com/john-broadway/proximo/main/docs/brand/proximo-architecture-light-985a61ba.svg" width="860">
   </picture>
 </p>
 
@@ -189,7 +189,7 @@ Run it yourself anywhere: <a href="./scripts/demo/hand_the_keys.py"><code>script
 
 Those backends are deliberately boring. Anyone can call them. **The product is the trust layer over them.**
 
-924 tools is an estate, not a starting point, and you only carry the part you use. Since 0.30 the floor IS the default: a bare install serves the search-and-call facade (~1,740 tokens of context) with every tool this box serves still callable; one domain like `pve.guests` runs ~9,781, a whole plane ~101,398, `PROXIMO_TOOLSETS=catalog` the classic auto-scoped catalog. **The estate is 924. The doorway is yours to size.** Coverage and context stopped being the same number.
+925 tools is an estate, not a starting point, and you only carry the part you use. Since 0.30 the floor IS the default: a bare install serves the search-and-call facade (~1,740 tokens of context) with every tool this box serves still callable; one domain like `pve.guests` runs ~9,781, a whole plane ~101,398, `PROXIMO_TOOLSETS=catalog` the classic auto-scoped catalog. **The estate is 924. The doorway is yours to size.** Coverage and context stopped being the same number.
 
 Where an operator actually starts:
 
@@ -216,7 +216,7 @@ Every tool with typed inputs: [`docs/TOOLS.md`](docs/TOOLS.md) · sizing the sur
 > requirement exports, the container image and the SBOM move to `mcp==2.2.0`, retiring the
 > constraint that had held them at 1.x since 0.39.0. The published floor does not move:
 > `mcp>=1.24,<3` still admits 1.x, and the CI compat leg installs the newest 1.x unpinned to
-> keep that claim honest. Proven on the newest of each major before shipping. 924 tools.
+> keep that claim honest. Proven on the newest of each major before shipping. 925 tools.
 >
 > Recent: **0.43.0** opened a raw GET door on every plane and gave Datacenter Manager its own identity core. See [SECURITY.md](SECURITY.md) for what each control honestly holds.
 
@@ -237,7 +237,7 @@ Wire it into your MCP client as the command `proximo`, with the `PROXIMO_*` env 
 
 > **Safe by default:** API-only out of the box. The two near-root edges are opt-in and say so loudly: LXC exec (`PROXIMO_ENABLE_EXEC=1`, near-root on the host) and the qemu-guest-agent edge (`PROXIMO_ENABLE_AGENT=1`, near-root in a guest). Each is scoped by its own fail-closed allowlist.
 >
-> **Smallest footprint by design:** you don't have to load the whole estate: what a box *serves* is autoscoped to what it configures. A PBS-only box gets that plane's tools plus the always-on audit trail; `PROXIMO_SURFACES=pve,exec` scopes the searchable catalog to that pair (320 tools); a typo'd surface refuses startup rather than serving a surprise. Surfaces choose *which planes are searchable*, never *how many schemas load*; the doorway stays the default unless you name another with `PROXIMO_TOOLSETS`. Scoping is context hygiene, not an authorization control: it changes what is advertised, never what a token is allowed to do. The default doorway (dynamic mode) keeps four search-and-call tools resident (`proximo_read` runs read-only tools with an enforced `readOnlyHint`; `proximo_call` runs anything) plus the two ledger tools (`audit_verify` proves the chain, `audit_entries` reads who did what) and `proximo_recall` while estate memory is on (the default; `PROXIMO_MEMORY=0` opts out), with the full catalog reachable by name. That narrowing is guarded at every entry point (0.27.0 closed a path where an opt-in flag could silently cut the registry to 5 tools), and the gates don't shrink with the doorway: PLAN and PROVE apply however small the visible surface gets.
+> **Smallest footprint by design:** you don't have to load the whole estate: what a box *serves* is autoscoped to what it configures. A PBS-only box gets that plane's tools plus the always-on audit trail; `PROXIMO_SURFACES=pve,exec` scopes the searchable catalog to that pair (321 tools); a typo'd surface refuses startup rather than serving a surprise. Surfaces choose *which planes are searchable*, never *how many schemas load*; the doorway stays the default unless you name another with `PROXIMO_TOOLSETS`. Scoping is context hygiene, not an authorization control: it changes what is advertised, never what a token is allowed to do. The default doorway (dynamic mode) keeps four search-and-call tools resident (`proximo_read` runs read-only tools with an enforced `readOnlyHint`; `proximo_call` runs anything) plus the two ledger tools (`audit_verify` proves the chain, `audit_entries` reads who did what) and `proximo_recall` while estate memory is on (the default; `PROXIMO_MEMORY=0` opts out), with the full catalog reachable by name. That narrowing is guarded at every entry point (0.27.0 closed a path where an opt-in flag could silently cut the registry to 5 tools), and the gates don't shrink with the doorway: PLAN and PROVE apply however small the visible surface gets.
 
 **The network faces (experimental, opt-in):** `proximo-a2a` speaks Agent2Agent. `proximo-http` serves plain HTTP + generated `/openapi.json` for no-code clients. `proximo-mcp-http` serves **MCP itself over Streamable HTTP** (the SDK's native transport) for networked MCP clients: no third-party stdio→HTTP bridge, so the perimeter stays Proximo's. **LXC on your Proxmox host, one line:** on the PVE node as root, `bash -c "$(curl -fsSL https://raw.githubusercontent.com/john-broadway/proximo/main/packaging/lxc/ct/proximo.sh)"` builds a Debian 13 container running `proximo-mcp-http` with Proximo from PyPI, its own service user, and a minted bearer on port 41243. Community-scripts engine (MIT) pointed at Proximo's own tree, their telemetry off; the same line inside the container updates it. Details: [docs/SETUP.md](docs/SETUP.md#as-an-lxc-on-the-proxmox-host), files: [`packaging/lxc/`](packaging/lxc/).
 
@@ -264,7 +264,7 @@ One container is the demo. A cluster is the point.
 
 _Every release before it (every pillar, every redteam, every fix) lives in [`CHANGELOG.md`](./CHANGELOG.md)._
 
-**The numbers, honestly:** 924 MCP tools, proved in two deliberate layers. **12,000+ in-process tests** (ruff + pyright clean) pin every tool's shape. A separate **live-smoke harness drives real Proxmox hardware**: a 3-node PVE 9.2 cluster, PBS 4.2, PMG 9.1, PDM 1.1.4, a real cross-datacenter move. The two are kept apart on purpose: passing shape tests never gets to masquerade as "works on a real host." And this workspace administers its own Proxmox estate through Proximo daily (dogfood). The **blast-radius engine** carries the destructive surface: across eleven op-classes it names the specific guests, nodes, principals, or disks at risk. Nothing falls back to a bare confirm.
+**The numbers, honestly:** 925 MCP tools, proved in two deliberate layers. **12,000+ in-process tests** (ruff + pyright clean) pin every tool's shape. A separate **live-smoke harness drives real Proxmox hardware**: a 3-node PVE 9.2 cluster, PBS 4.2, PMG 9.1, PDM 1.1.4, a real cross-datacenter move. The two are kept apart on purpose: passing shape tests never gets to masquerade as "works on a real host." And this workspace administers its own Proxmox estate through Proximo daily (dogfood). The **blast-radius engine** carries the destructive surface: across eleven op-classes it names the specific guests, nodes, principals, or disks at risk. Nothing falls back to a bare confirm.
 
 **Proven live** (not mocks): the trust spine end-to-end; identity/storage/SDN/firewall/HA create→read→delete with the ledger verified throughout; offline + online live-migration and HA fencing (softdog) on a real 3-node cluster; full PBS/PMG/PDM planes including a real cross-datacenter move.
 **Not yet proven — said plainly:** *hardware*-watchdog fencing (needs physical iTCO/IPMI) and behavior at production scale. The unrecoverable ops (SDN *apply*, etc.) are deliberately never fired live: proven by plan, held back by design, not a gap. Per-surface detail: [`CHANGELOG.md`](./CHANGELOG.md).
@@ -278,7 +278,7 @@ _Every release before it (every pillar, every redteam, every fix) lives in [`CHA
 | **[Verify](VERIFY.md)** | Every trust claim paired with the command that proves it. Run them cold. |
 | **[Security](SECURITY.md)** | The two-deployment trust model, all thirteen controls, what each honestly holds, reporting. |
 | **[Threat model](docs/THREAT_MODEL.md)** | What Proximo defends against, what it doesn't, where the boundaries sit. |
-| **[Tools](docs/TOOLS.md)** | All 924 tools, grouped by surface, typed inputs. |
+| **[Tools](docs/TOOLS.md)** | All 925 tools, grouped by surface, typed inputs. |
 | **[Agents](AGENTS.md)** | The page written for the agent itself: Proximo's sharp edges, stated first. |
 | **[Known issues](docs/known-issues.md)** | What's broken or odd right now, said plainly. |
 | **[Contributing](.github/CONTRIBUTING.md)** | Dev setup, the CI gates, what a PR is expected to keep intact. |
