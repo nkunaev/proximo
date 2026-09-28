@@ -652,6 +652,30 @@ def _plan(action: str, target: str, build: Callable[[], Plan]) -> Plan:
     return plan
 
 
+def _resolve_guest(name: str, api, vmid: str, kind: str | None, node: str | None, *,
+                   mutation: bool, need_node: bool = True) -> tuple[str, str | None]:
+    """cluster_ops.resolve_guest for a tool wrapper, with its refusal on the ledger.
+
+    Resolution runs before the plan, so a refusal (an explicit kind or node the cluster
+    contradicts) would otherwise leave no trace; it is recorded the way _plan records a failed
+    probe, under the tool's own name, and re-raised."""
+    from .cluster_ops import resolve_guest
+
+    try:
+        return resolve_guest(api, vmid, kind, node, need_node=need_node)
+    except ProximoError as e:
+        _ledger().record(
+            name,
+            target=f"{kind or 'guest'}/{vmid}",
+            mutation=mutation,
+            outcome="error",
+            detail={"error": type(e).__name__, "phase": "resolve"},
+            principal=ledger_principal(),
+            remote=ledger_remote(),
+        )
+        raise
+
+
 def run_governed(
     name: str,
     target: str,

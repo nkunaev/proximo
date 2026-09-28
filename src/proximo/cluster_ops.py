@@ -217,6 +217,47 @@ def cluster_resources(api, resource_type: str | None = None) -> list[dict]:
     return api._get("/cluster/resources") or []
 
 
+def resolve_guest(
+    api,
+    vmid: str,
+    kind: str | None = None,
+    node: str | None = None,
+    *,
+    need_node: bool = True,
+) -> tuple[str, str | None]:
+    """Fill a guest's missing kind and node from GET /cluster/resources?type=vm.
+
+    VMIDs are cluster-unique, and one row carries both the guest's type and the node it is on,
+    so an omitted `kind` or `node` is answered by the cluster instead of guessed ("lxc", the
+    configured node): a guessed value on a live guest reaches PVE as a 500 or a 403 that reads
+    like a permissions problem. An explicit value the cluster contradicts is refused with the
+    real one named. Nothing to fill means no request. `need_node=False` for callers that only
+    need the kind (HA SIDs are cluster-scoped).
+
+    When the listing cannot be read, or does not carry the VMID (no such guest, or one this
+    token cannot see), the missing values fall back to the pre-resolution defaults ("lxc", the
+    configured node): the caller's own read then meets PVE's 404 and its PLAN says so, exactly
+    as before this resolver existed.
+    """
+    if kind is not None and (node is not None or not need_node):
+        return kind, node
+    vmid = _check_vmid(vmid)
+    try:
+        rows = api._get("/cluster/resources?type=vm")
+    except Exception:
+        rows = None
+    row = next((r for r in rows if isinstance(r, dict) and str(r.get("vmid")) == vmid
+                and r.get("type") in ("qemu", "lxc")), None) if isinstance(rows, list) else None
+    if row is None:
+        return kind or "lxc", node
+    if kind is not None and kind != row["type"]:
+        raise ProximoError(f"VMID {vmid} is a {row['type']} guest, not {kind}")
+    found = row.get("node")
+    if node is not None and found and node != found:
+        raise ProximoError(f"VMID {vmid} is on node {found!r}, not {node!r}")
+    return row["type"], node or found
+
+
 def _is_ha_groups_migrated(exc: httpx.HTTPStatusError) -> bool:
     """True if this is PVE 9's 'HA groups removed → use rules' 500.
 

@@ -43,6 +43,7 @@ import re
 
 from . import blast as blast_engine
 from .backends import ProximoError, _check_kind, _check_node, _check_vmid
+from .cluster_ops import resolve_guest
 from .planning import RISK_HIGH, RISK_LOW, RISK_MEDIUM, Plan, _max_risk
 
 # Firewall comment/freetext fields are stored in PVE's line-based config files (cluster.fw, guest .fw).
@@ -144,18 +145,16 @@ def _fw_base(
     _check_scope(scope)
     if scope == "cluster":
         return "/cluster/firewall"
-    n = node or api.config.node
-    _check_node(n)
+    _check_node(node)
     if scope == "node":
-        return f"/nodes/{n}/firewall"
+        return f"/nodes/{node or api.config.node}/firewall"
     # guest scope
     if vmid is None:
         raise ProximoError("vmid is required for guest scope")
-    if kind is None:
-        kind = "lxc"
     vmid = _check_vmid(vmid)
+    kind, node = resolve_guest(api, vmid, kind, node)
     kind = _check_kind(kind)
-    return f"/nodes/{n}/{kind}/{vmid}/firewall"
+    return f"/nodes/{node or api.config.node}/{kind}/{vmid}/firewall"
 
 
 # ---------------------------------------------------------------------------
@@ -461,7 +460,7 @@ def _scope_label(scope: str, node: str | None, vmid: str | None, kind: str | Non
         return "cluster (all nodes and guests)"
     if scope == "node":
         return f"node/{node or 'default'}"
-    return f"{kind or 'lxc'}/{vmid}"
+    return f"{kind or 'guest'}/{vmid}"
 
 
 def _enable_flag(raw) -> bool:

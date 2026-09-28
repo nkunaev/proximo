@@ -34,6 +34,7 @@ from proximo.cluster_ops import (
 from proximo.projection import classify_task_outcome, envelope_rows, envelope_windowed, project_rows
 from proximo.server import (
     _audited,
+    _resolve_guest,
     run_governed,
     tool,
 )
@@ -157,8 +158,8 @@ def pve_guest_migrate_preflight(
 def pve_guest_migrate(
     vmid: Annotated[str, Field(description="Numeric VMID/CTID of the guest to migrate.")],
     target: Annotated[str, Field(description="Destination node name to migrate the guest to.")],
-    kind: Annotated[str, Field(description="Guest type: 'lxc' or 'qemu'.")] = "lxc",
-    node: Annotated[str | None, Field(description="Source node name; defaults to the configured node.")] = None,
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
+    node: Annotated[str | None, Field(description="Source node name. Omit to resolve it automatically from the cluster.")] = None,
     online: Annotated[bool, Field(description="QEMU: live migration (the guest keeps running; local disks also need with_local_disks). LXC: stop-move-start restart migration (real downtime). False = offline migration.")] = False,
     with_local_disks: Annotated[bool, Field(description="QEMU only: copy disks on local (non-shared) storage to the target as part of the migration, live or offline. Without it PVE refuses a guest with a local disk.")] = False,
     targetstorage: Annotated[str | None, Field(description="Where copied local disks land on the target: '1' (same storage ID), one storage ID for all, or 'src:dst' pairs comma-separated. QEMU 'targetstorage', LXC 'target-storage'.")] = None,
@@ -174,6 +175,7 @@ def pve_guest_migrate(
     instead, use pdm_pve_lxc_migrate or pdm_pve_qemu_migrate.
     """
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_guest_migrate", api, vmid, kind, node, mutation=True)
     tgt = f"{kind}/{vmid}->{target}"
     opts = {"with_local_disks": with_local_disks, "targetstorage": targetstorage,
             "bwlimit": bwlimit, "migration_type": migration_type}
@@ -187,7 +189,7 @@ def pve_guest_migrate(
 @tool()
 def pve_ha_resource_add(
     vmid: Annotated[str, Field(description="Numeric VMID/CTID of the guest to add to HA management.")],
-    kind: Annotated[str, Field(description="Guest type: 'lxc' or 'qemu'.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     group: Annotated[str | None, Field(description="HA group to assign (PVE 8 only; PVE 9 removed groups in favor of HA rules — omit on PVE 9).")] = None,
     state: Annotated[str | None, Field(description="Desired HA state, e.g. 'started', 'stopped', 'disabled' ('stopped' has the CRM stop the guest).")] = None,
     max_restart: Annotated[int | None, Field(description="Max number of restart attempts the CRM makes before giving up.")] = None,
@@ -200,6 +202,7 @@ def pve_ha_resource_add(
     typically returns null, not a UPID. To remove HA management use pve_ha_resource_remove.
     """
     _, api, _, _ = _proximo_server._svc()
+    kind, _ = _resolve_guest("pve_ha_resource_add", api, vmid, kind, None, mutation=True, need_node=False)
     tgt = f"ha:{kind}/{vmid}"
     return run_governed(
         "pve_ha_resource_add", tgt,
@@ -211,7 +214,7 @@ def pve_ha_resource_add(
 @tool()
 def pve_ha_resource_remove(
     vmid: Annotated[str, Field(description="Numeric VMID/CTID of the guest to remove from HA management.")],
-    kind: Annotated[str, Field(description="Guest type: 'lxc' or 'qemu'.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     confirm: Annotated[bool, Field(description="False (default) returns a dry-run PLAN only; True executes the change.")] = False,
 ) -> dict:
     """MUTATION: remove a guest from HA management. Dry-run by default — the PLAN shows the SID
@@ -220,6 +223,7 @@ def pve_ha_resource_remove(
     UPID. To re-add HA management use pve_ha_resource_add.
     """
     _, api, _, _ = _proximo_server._svc()
+    kind, _ = _resolve_guest("pve_ha_resource_remove", api, vmid, kind, None, mutation=True, need_node=False)
     tgt = f"ha:{kind}/{vmid}"
     return run_governed(
         "pve_ha_resource_remove", tgt,
