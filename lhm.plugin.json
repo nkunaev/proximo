@@ -22524,13 +22524,16 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: lxc or qemu.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
-            "description": "Proxmox node hosting the guest; defaults to the configured node if omitted.",
+            "description": "Proxmox node hosting the guest. Omit to resolve it automatically from the cluster.",
             "type": [
               "string",
               "null"
@@ -25095,13 +25098,16 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: 'lxc' or 'qemu'.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
-            "description": "Source node name; defaults to the configured node.",
+            "description": "Source node name. Omit to resolve it automatically from the cluster.",
             "type": [
               "string",
               "null"
@@ -25135,9 +25141,12 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: 'lxc' or 'qemu'.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "group": {
             "default": null,
@@ -25193,9 +25202,12 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: 'lxc' or 'qemu'.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "confirm": {
             "default": false,
@@ -26983,9 +26995,12 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: `lxc` for a container or `qemu` for a VM.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
@@ -27016,9 +27031,12 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: `lxc` for a container or `qemu` for a VM.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
@@ -27051,9 +27069,12 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: `lxc` for a container or `qemu` for a VM.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
@@ -27084,9 +27105,12 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: `lxc` for a container or `qemu` for a VM.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
@@ -27131,9 +27155,12 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: `lxc` for a container or `qemu` for a VM.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
@@ -27170,9 +27197,12 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: `lxc` for a container or `qemu` for a VM.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
@@ -27441,9 +27471,12 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: `lxc` for a container or `qemu` for a VM.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
@@ -27505,9 +27538,12 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: `lxc` for a container or `qemu` for a VM.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
@@ -27707,9 +27743,12 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: `lxc` for a container or `qemu` for a VM.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
@@ -27741,9 +27780,12 @@
             "type": "object"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: `lxc` for a container or `qemu` for a VM.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
@@ -27781,9 +27823,12 @@
             "type": "object"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: `lxc` for a container or `qemu` for a VM.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
@@ -27824,9 +27869,12 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: `lxc` for a container or `qemu` for a VM.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,
@@ -27868,9 +27916,12 @@
             "type": "string"
           },
           "kind": {
-            "default": "lxc",
-            "description": "Guest type: `lxc` for a container or `qemu` for a VM.",
-            "type": "string"
+            "default": null,
+            "description": "Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "node": {
             "default": null,

@@ -51,6 +51,7 @@ from proximo.freshness import backup_freshness
 from proximo.projection import cap_newest
 from proximo.server import (
     _audited,
+    _resolve_guest,
     run_governed,
     tool,
 )
@@ -63,14 +64,15 @@ def pve_backup(
     storage: Annotated[str, Field(description="Storage ID to write the backup archive to.")],
     mode: Annotated[str, Field(description="Backup mode: snapshot (online, brief) | suspend (RAM-quiesced pause) | stop (HALTS the guest).")] = "snapshot",
     compress: Annotated[str, Field(description="Compression algorithm for the archive, e.g. zstd, gzip, lzo, or 0 (no compression).")] = "zstd",
-    kind: Annotated[str, Field(description="Guest type: lxc or qemu.")] = "lxc",
-    node: Annotated[str | None, Field(description="Proxmox node hosting the guest; defaults to the configured node if omitted.")] = None,
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
+    node: Annotated[str | None, Field(description="Proxmox node hosting the guest. Omit to resolve it automatically from the cluster.")] = None,
     confirm: Annotated[bool, Field(description="Gate: false returns a dry-run PLAN, true executes the backup.")] = False,
 ) -> dict:
     """MUTATION: back up a guest with vzdump. Dry-run by default; confirm=True to execute.
     mode: snapshot (online, brief) | suspend | stop (HALTS the guest). Async — returns a task UPID.
     This is a one-off run; for a recurring schedule use pve_backup_job_create instead."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_backup", api, vmid, kind, node, mutation=True)
     target = f"{kind}/{vmid}"
     return run_governed(
         "pve_backup", target,

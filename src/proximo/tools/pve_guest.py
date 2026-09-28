@@ -63,6 +63,7 @@ from proximo.server import (
     _exec_disabled,
     _node_shell_disabled,
     _plan,
+    _resolve_guest,
     run_governed,
     tool,
 )
@@ -110,7 +111,7 @@ def pve_list_guests(
 @tool()
 def pve_guest_status(
     vmid: Annotated[str, Field(description="Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container.")],
-    kind: Annotated[str, Field(description="Guest type: `lxc` for a container or `qemu` for a VM.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     node: Annotated[str | None, Field(description="PVE node the guest runs on. Omit to resolve it automatically from the cluster.")] = None,
 ) -> dict:
     """READ-ONLY: Read the operational status and current configuration of a single guest (kind='lxc' or
@@ -118,6 +119,7 @@ def pve_guest_status(
     (CPU/memory/disk/network/uptime) — operational metrics, not its stored configuration.
     Use pve_guest_config_get for the full configuration."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_guest_status", api, vmid, kind, node, mutation=False)
     return _audited("pve_guest_status", f"{kind}/{vmid}", lambda: api.guest_status(vmid, kind, node))
 
 
@@ -127,7 +129,7 @@ def pve_guest_status(
 def pve_guest_power(
     vmid: Annotated[str, Field(description="Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container.")],
     action: Annotated[str, Field(description="Power action to perform: `start`, `stop`, `reboot`, or `shutdown`.")],
-    kind: Annotated[str, Field(description="Guest type: `lxc` for a container or `qemu` for a VM.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     node: Annotated[str | None, Field(description="PVE node the guest runs on. Omit to resolve it automatically from the cluster.")] = None,
     confirm: Annotated[bool, Field(description="Leave `false` (default) to get a dry-run PLAN with blast radius; set `true` to execute the action.")] = False,
 ) -> dict:
@@ -139,6 +141,7 @@ def pve_guest_power(
     and returns the task UPID — poll it with pve_task_status.
     """
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_guest_power", api, vmid, kind, node, mutation=True)
     target = f"{kind}/{vmid}:{action}"
     # PVE guest power is task-backed (POST .../status/{action} returns a UPID) — async, like the
     # identical-shape node_service_control. Record "submitted", never "ok": the ledger must not claim
@@ -155,13 +158,14 @@ def pve_guest_power(
 @tool()
 def pve_snapshot_list(
     vmid: Annotated[str, Field(description="Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container.")],
-    kind: Annotated[str, Field(description="Guest type: `lxc` for a container or `qemu` for a VM.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     node: Annotated[str | None, Field(description="PVE node the guest runs on. Omit to resolve it automatically from the cluster.")] = None,
 ) -> list[dict]:
     """READ-ONLY: List a guest's snapshots. Returns each snapshot's name, description, parent,
     and creation time, plus the synthetic 'current' node showing live state. Works for both VMs
     and containers (kind='qemu' or 'lxc'). Use pve_snapshot_create / pve_rollback to act on them."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_snapshot_list", api, vmid, kind, node, mutation=False)
     return _audited("pve_snapshot_list", f"{kind}/{vmid}", lambda: api.snapshot_list(vmid, kind, node))
 
 
@@ -169,7 +173,7 @@ def pve_snapshot_list(
 def pve_snapshot_create(
     vmid: Annotated[str, Field(description="Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container.")],
     snapname: Annotated[str, Field(description="Name for the new snapshot.")],
-    kind: Annotated[str, Field(description="Guest type: `lxc` for a container or `qemu` for a VM.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     node: Annotated[str | None, Field(description="PVE node the guest runs on. Omit to resolve it automatically from the cluster.")] = None,
     description: Annotated[str | None, Field(description="Optional free-text description stored on the snapshot.")] = None,
     confirm: Annotated[bool, Field(description="Leave `false` (default) to get a dry-run PLAN; set `true` to execute the snapshot creation.")] = False,
@@ -179,6 +183,7 @@ def pve_snapshot_create(
     To restore to a snapshot use pve_rollback; to remove one use pve_snapshot_delete; to list them
     use pve_snapshot_list."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_snapshot_create", api, vmid, kind, node, mutation=True)
     target = f"{kind}/{vmid}:{snapname}"
     return run_governed(
         "pve_snapshot_create", target,
@@ -191,7 +196,7 @@ def pve_snapshot_create(
 def pve_rollback(
     vmid: Annotated[str, Field(description="Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container.")],
     snapname: Annotated[str, Field(description="Name of the snapshot to roll the guest back to.")],
-    kind: Annotated[str, Field(description="Guest type: `lxc` for a container or `qemu` for a VM.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     node: Annotated[str | None, Field(description="PVE node the guest runs on. Omit to resolve it automatically from the cluster.")] = None,
     confirm: Annotated[bool, Field(description="Leave `false` (default) to get a dry-run PLAN with blast radius; set `true` to execute the rollback.")] = False,
 ) -> dict:
@@ -200,6 +205,7 @@ def pve_rollback(
     returns the task UPID, poll with pve_task_status. To create a restore point first use
     pve_snapshot_create."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_rollback", api, vmid, kind, node, mutation=True)
     target = f"{kind}/{vmid}:{snapname}"
     return run_governed(
         "pve_rollback", target,
@@ -212,7 +218,7 @@ def pve_rollback(
 def pve_snapshot_delete(
     vmid: Annotated[str, Field(description="Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container.")],
     snapname: Annotated[str, Field(description="Name of the snapshot to delete.")],
-    kind: Annotated[str, Field(description="Guest type: `lxc` for a container or `qemu` for a VM.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     node: Annotated[str | None, Field(description="PVE node the guest runs on. Omit to resolve it automatically from the cluster.")] = None,
     force: Annotated[bool, Field(description="Force removal even if the snapshot has children or the backend reports an inconsistent state.")] = False,
     confirm: Annotated[bool, Field(description="Leave `false` (default) to get a dry-run PLAN; set `true` to execute the deletion.")] = False,
@@ -221,6 +227,7 @@ def pve_snapshot_delete(
     Dry-run by default; confirm=True to execute. Async — returns the task UPID, poll with
     pve_task_status. To create a snapshot instead of removing one use pve_snapshot_create."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_snapshot_delete", api, vmid, kind, node, mutation=True)
     target = f"{kind}/{vmid}:{snapname}"
     return run_governed(
         "pve_snapshot_delete", target,
@@ -463,7 +470,7 @@ def pve_create_vm(
 def pve_clone(
     vmid: Annotated[str, Field(description="Numeric ID of the source guest to clone — VMID for a QEMU VM or CTID for an LXC container.")],
     newid: Annotated[str, Field(description="Numeric ID to assign to the new cloned guest.")],
-    kind: Annotated[str, Field(description="Guest type: `lxc` for a container or `qemu` for a VM.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     node: Annotated[str | None, Field(description="PVE node the source guest runs on. Omit to resolve it automatically from the cluster.")] = None,
     name: Annotated[str | None, Field(description="Name to give the new cloned guest.")] = None,
     full: Annotated[bool, Field(description="If true, make a full independent copy of the disks; if false (default), make a space-saving linked clone.")] = False,
@@ -477,6 +484,7 @@ def pve_clone(
     only) — keeps a clone off the source storage; refused for a linked clone (PVE only honors it
     on a full clone). To create a guest from scratch instead use pve_create_vm / pve_create_container."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_clone", api, vmid, kind, node, mutation=True)
     target = f"{kind}/{vmid}->{newid}"
     return run_governed(
         "pve_clone", target,
@@ -488,7 +496,7 @@ def pve_clone(
 @tool()
 def pve_delete_guest(
     vmid: Annotated[str, Field(description="Numeric ID of the guest to destroy — VMID for a QEMU VM or CTID for an LXC container.")],
-    kind: Annotated[str, Field(description="Guest type: `lxc` for a container or `qemu` for a VM.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     node: Annotated[str | None, Field(description="PVE node the guest runs on. Omit to resolve it automatically from the cluster.")] = None,
     purge: Annotated[bool, Field(description="If true, also remove the guest from replication/backup jobs and HA resources referencing it.")] = False,
     force: Annotated[bool, Field(description="Force removal even if the guest is still running or the backend reports an inconsistent state.")] = False,
@@ -499,6 +507,7 @@ def pve_delete_guest(
     HA/replication references. confirm=True to execute. Async — returns the task UPID; poll with
     pve_task_status. No undo once confirmed."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_delete_guest", api, vmid, kind, node, mutation=True)
     target = f"{kind}/{vmid}"
     return run_governed(
         "pve_delete_guest", target,
@@ -588,7 +597,7 @@ def pve_storage_content_delete(
 @tool()
 def pve_guest_config_get(
     vmid: Annotated[str, Field(description="Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container.")],
-    kind: Annotated[str, Field(description="Guest type: `lxc` for a container or `qemu` for a VM.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     node: Annotated[str | None, Field(description="PVE node the guest runs on. Omit to resolve it automatically from the cluster.")] = None,
 ) -> dict:
     """READ-ONLY: read a guest's current configuration (kind='lxc' or 'qemu'). Returns the
@@ -596,6 +605,7 @@ def pve_guest_config_get(
     pve_guest_config_set to mutate; capture the returned dict to enable rollback via
     pve_guest_config_revert."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_guest_config_get", api, vmid, kind, node, mutation=False)
     return _audited("pve_guest_config_get", f"{kind}/{vmid}",
                     lambda: guest_config_get(api, vmid, kind, node))
 
@@ -604,7 +614,7 @@ def pve_guest_config_get(
 def pve_guest_config_set(
     vmid: Annotated[str, Field(description="Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container.")],
     changes: Annotated[dict, Field(description="Config keys to change, e.g. {'cores': 4, 'memory': 2048, 'onboot': 1}.")],
-    kind: Annotated[str, Field(description="Guest type: `lxc` for a container or `qemu` for a VM.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     node: Annotated[str | None, Field(description="PVE node the guest runs on. Omit to resolve it automatically from the cluster.")] = None,
     confirm: Annotated[bool, Field(description="Leave `false` (default) to get a dry-run PLAN with the per-key diff; set `true` to execute.")] = False,
 ) -> dict:
@@ -613,6 +623,7 @@ def pve_guest_config_set(
     {prior_config, applied, deleted}; prior_config is what makes the change revertible via
     pve_guest_config_revert."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_guest_config_set", api, vmid, kind, node, mutation=True)
     target = f"{kind}/{vmid}"
     return run_governed(
         "pve_guest_config_set", target,
@@ -625,7 +636,7 @@ def pve_guest_config_set(
 def pve_guest_config_revert(
     vmid: Annotated[str, Field(description="Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container.")],
     prior_config: Annotated[dict, Field(description="The prior config dict previously returned by pve_guest_config_set, to re-apply.")],
-    kind: Annotated[str, Field(description="Guest type: `lxc` for a container or `qemu` for a VM.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     node: Annotated[str | None, Field(description="PVE node the guest runs on. Omit to resolve it automatically from the cluster.")] = None,
     confirm: Annotated[bool, Field(description="Leave `false` (default) to get a dry-run PLAN; set `true` to execute the revert.")] = False,
 ) -> dict:
@@ -634,6 +645,7 @@ def pve_guest_config_revert(
     {reverted_to_keys, deleted, skipped_unsettable}; computed/read-only keys in prior_config are
     silently skipped rather than rejected."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_guest_config_revert", api, vmid, kind, node, mutation=True)
     target = f"{kind}/{vmid}"
     return run_governed(
         "pve_guest_config_revert", target,
@@ -649,7 +661,7 @@ def pve_disk_resize(
     vmid: Annotated[str, Field(description="Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container.")],
     disk: Annotated[str, Field(description="Disk key to resize, e.g. `scsi0` or `rootfs`.")],
     size: Annotated[str, Field(description="New size, as a grow-only delta like `+10G` (shrinking is refused as destructive).")],
-    kind: Annotated[str, Field(description="Guest type: `lxc` for a container or `qemu` for a VM.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     node: Annotated[str | None, Field(description="PVE node the guest runs on. Omit to resolve it automatically from the cluster.")] = None,
     confirm: Annotated[bool, Field(description="Leave `false` (default) to get a dry-run PLAN; set `true` to execute the resize.")] = False,
 ) -> dict:
@@ -658,6 +670,7 @@ def pve_disk_resize(
     verified first. Dry-run by default; confirm=True to execute. Async — returns a task UPID
     (poll with pve_task_status). To move a disk to different storage instead use pve_disk_move."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_disk_resize", api, vmid, kind, node, mutation=True)
     target = f"{kind}/{vmid}:{disk}"
     return run_governed(
         "pve_disk_resize", target,
@@ -671,7 +684,7 @@ def pve_disk_move(
     vmid: Annotated[str, Field(description="Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container.")],
     disk: Annotated[str, Field(description="Disk key to move, e.g. `scsi0` or `rootfs`.")],
     target_storage: Annotated[str, Field(description="Storage backend name to move the disk to.")],
-    kind: Annotated[str, Field(description="Guest type: `lxc` for a container or `qemu` for a VM.")] = "lxc",
+    kind: Annotated[str | None, Field(description="Guest type: `lxc` or `qemu`. Omit to detect it from the cluster.")] = None,
     node: Annotated[str | None, Field(description="PVE node the guest runs on. Omit to resolve it automatically from the cluster.")] = None,
     delete_source: Annotated[bool, Field(description="If true, delete the source copy after the move (HIGH risk); if false (default), keep it.")] = False,
     confirm: Annotated[bool, Field(description="Leave `false` (default) to get a dry-run PLAN; set `true` to execute the move.")] = False,
@@ -681,6 +694,7 @@ def pve_disk_move(
     undo). confirm=True to execute. Async — returns a task UPID (poll with pve_task_status). To
     grow a disk in place instead of relocating it use pve_disk_resize."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_disk_move", api, vmid, kind, node, mutation=True)
     target = f"{kind}/{vmid}:{disk}"
     return run_governed(
         "pve_disk_move", target,
@@ -702,6 +716,7 @@ def pve_cloudinit_get(
     Use pve_cloudinit_set to mutate it; the set operation auto-captures an undo record for
     rollback."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_cloudinit_get", api, vmid, kind, node, mutation=False)
     return _audited("pve_cloudinit_get", f"{kind}/{vmid}",
                     lambda: cloudinit_get(api, vmid, node, kind))
 
@@ -720,6 +735,7 @@ def pve_cloudinit_set(
     status/result (secret fields excluded). Effects apply on next reboot + cloud-init regen, not live. Read current
     values with pve_cloudinit_get."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_cloudinit_set", api, vmid, kind, node, mutation=True)
     target = f"{kind}/{vmid}"
     plan = _plan("pve_cloudinit_set", target,
                  lambda: plan_cloudinit_set(api, vmid, changes, node, kind))
@@ -754,6 +770,7 @@ def pve_template_convert(
     Dry-run by default (the PLAN flags it HIGH/irreversible, and separately warns if the guest is
     already a template); confirm=True executes, recorded as submitted (async)."""
     _, api, _, _ = _proximo_server._svc()
+    kind, node = _resolve_guest("pve_template_convert", api, vmid, kind, node, mutation=True)
     target = f"{kind}/{vmid}"
     return run_governed(
         "pve_template_convert", target,
