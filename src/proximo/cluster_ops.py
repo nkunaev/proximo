@@ -13,7 +13,7 @@ Key structural notes vs the node-scoped modules (storage, backup, provisioning):
 - LXC has NO live migration (no zero-downtime path). online=True for LXC sends restart=1,
   which is a stop→move→start cycle — real downtime. RISK_HIGH for any migrate where
   downtime is possible (offline always; online LXC always; online QEMU = MEDIUM because
-  it is designed for live transfer, but can still fail without shared storage).
+  it is designed for live transfer, but can still fail mid-transfer).
 
 Endpoint-shape risks flagged throughout with "Smoke-confirm:" comments.
 """
@@ -93,6 +93,91 @@ def _check_target_node(target: str) -> str:
     # Delegate to _check_node's regex by passing as a non-None value.
     _check_node(t)
     return t
+
+
+# PVE storage identifier (pve-storage-id): starts with a letter, then letters/digits/-/_/.
+_STORAGE_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9._-]*\Z")
+_VALID_MIGRATION_TYPES = frozenset({"secure", "insecure"})
+
+
+def _check_storage_map(value: str) -> str:
+    """targetstorage as PVE takes it: '1' (each source storage maps to itself), one storage ID
+    (every local disk lands there), or a comma list of 'source:target' pairs with at most one bare
+    ID as the default for unlisted sources."""
+    s = str(value).strip()
+    if s == "1":
+        return s
+    defaults = 0
+    for entry in s.split(","):
+        parts = entry.split(":")
+        if len(parts) > 2 or not all(_STORAGE_ID_RE.match(p) for p in parts):
+            raise ProximoError(
+                f"invalid targetstorage: {value!r} (expected '1', a storage ID, or 'src:dst' pairs "
+                "separated by commas)"
+            )
+        defaults += len(parts) == 1
+    if defaults > 1:
+        raise ProximoError(f"invalid targetstorage: {value!r} (at most one bare storage ID as the default)")
+    return s
+
+
+def parse_storage_map(value: str | None) -> tuple[str | None, dict[str, str]]:
+    """(default, {source: target}) from a validated targetstorage; (None, {}) means identity."""
+    if value is None or value == "1":
+        return None, {}
+    default: str | None = None
+    pairs: dict[str, str] = {}
+    for entry in value.split(","):
+        src, sep, dst = entry.partition(":")
+        if sep:
+            pairs[src] = dst
+        else:
+            default = src
+    return default, pairs
+
+
+def migrate_options(
+    kind: str,
+    with_local_disks: bool = False,
+    targetstorage: str | None = None,
+    bwlimit: int | None = None,
+    migration_type: str | None = None,
+) -> dict:
+    """Validate the optional migrate knobs for `kind` and return them in PVE's wire form.
+
+    Shared by guest_migrate and plan_migrate, so a PLAN refuses exactly what the execute would.
+    QEMU: 'with-local-disks', 'targetstorage', 'bwlimit' (KiB/s), 'migration_type'.
+    LXC: 'target-storage', 'bwlimit'. LXC moves local volumes without a flag and has no
+    migration_type, so those two are refused for LXC rather than silently dropped.
+    """
+    data: dict = {}
+    if with_local_disks:
+        if kind != "qemu":
+            raise ProximoError(
+                "with_local_disks is a QEMU parameter; an LXC migration moves local volumes without it"
+            )
+        data["with-local-disks"] = 1
+    if targetstorage is not None:
+        data["targetstorage" if kind == "qemu" else "target-storage"] = _check_storage_map(targetstorage)
+    if bwlimit is not None:
+        if isinstance(bwlimit, bool):
+            raise ProximoError(f"invalid bwlimit: {bwlimit!r} (KiB/s as a non-negative integer)")
+        try:
+            limit = int(bwlimit)
+        except (TypeError, ValueError) as exc:
+            raise ProximoError(f"invalid bwlimit: {bwlimit!r} (KiB/s as a non-negative integer)") from exc
+        if limit < 0:
+            raise ProximoError(f"invalid bwlimit: {bwlimit!r} (KiB/s as a non-negative integer)")
+        data["bwlimit"] = limit
+    if migration_type is not None:
+        if kind != "qemu":
+            raise ProximoError("migration_type is a QEMU parameter; LXC migration has no such option")
+        if migration_type not in _VALID_MIGRATION_TYPES:
+            raise ProximoError(
+                f"invalid migration_type: {migration_type!r} (expected one of {sorted(_VALID_MIGRATION_TYPES)})"
+            )
+        data["migration_type"] = migration_type
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +293,11 @@ def guest_migrate(
     kind: str = "lxc",
     node: str | None = None,
     online: bool = False,
+    *,
+    with_local_disks: bool = False,
+    targetstorage: str | None = None,
+    bwlimit: int | None = None,
+    migration_type: str | None = None,
 ) -> str:
     """Migrate a guest to a different node.
 
@@ -216,10 +306,12 @@ def guest_migrate(
     node: source node (defaults to api.config.node).
     target: destination node (required, non-empty).
     online:
-      - QEMU: online=True sends 'online=1' (live migration, zero-downtime path; requires shared storage).
+      - QEMU: online=True sends 'online=1' (live migration). Disks on shared storage stay put; a disk
+        on local storage is copied to the target only with with_local_disks=True, otherwise PVE refuses.
       - LXC: 'live migration' doesn't exist — online=True sends 'restart=1' (stop→move→start cycle;
         this is still real downtime). See plan_migrate for honest blast radius per kind.
       - online=False (default): offline migration (guest must be stopped OR restart accepted).
+    with_local_disks / targetstorage / bwlimit / migration_type: see migrate_options.
 
     Returns a UPID string. Migration is ASYNC — outcome="submitted" in the ledger; poll task_status
     to confirm completion.
@@ -228,7 +320,7 @@ def guest_migrate(
 
     Smoke-confirm: verify the exact param name for LXC restart migration ('restart' vs 'online');
     verify QEMU live migration param name ('online'); verify UPID is always returned vs None for
-    same-node noop; verify 'with-local-disks' param is available for offline QEMU migration.
+    same-node noop.
     """
     vmid = _check_vmid(vmid)
     kind = _check_kind(kind)
@@ -237,6 +329,7 @@ def guest_migrate(
     n = node or api.config.node
 
     data: dict = {"target": target}
+    data.update(migrate_options(kind, with_local_disks, targetstorage, bwlimit, migration_type))
     if online:
         if kind == "qemu":
             # QEMU live migration: 'online=1'
@@ -349,6 +442,11 @@ def plan_migrate(
     kind: str = "lxc",
     node: str | None = None,
     online: bool = False,
+    *,
+    with_local_disks: bool = False,
+    targetstorage: str | None = None,
+    bwlimit: int | None = None,
+    migration_type: str | None = None,
 ) -> Plan:
     """Preview migrating a guest to another node.
 
@@ -357,7 +455,8 @@ def plan_migrate(
 
     Risk:
     - QEMU + online=True  → RISK_MEDIUM: live migration is designed to be near-seamless,
-      but still requires shared storage and can fail (failover ≠ zero-risk).
+      but can fail mid-transfer (failover ≠ zero-risk). A local disk without with_local_disks
+      escalates to HIGH (PVE refuses); with it, the disk copy is named and sized in the blast.
     - All other paths     → RISK_HIGH: guest downtime is possible or certain.
       * Offline migration (online=False, any kind): guest must be stopped / brief downtime.
       * LXC + online=True ('restart' migration): stop → move → start = confirmed downtime.
@@ -370,6 +469,7 @@ def plan_migrate(
     _check_node(node)
     target = _check_target_node(target)
     n = node or api.config.node
+    options = migrate_options(kind, with_local_disks, targetstorage, bwlimit, migration_type)
 
     current: dict = {}
     check_failed = False
@@ -407,11 +507,12 @@ def plan_migrate(
         # QEMU live migration: designed for near-zero downtime, but NOT a guarantee.
         blast = [
             f"LIVE-migrates {kind}/{vmid} (name={name!r}, {status}) from {n} to {target!r}",
-            "near-seamless for running guests — requires shared storage; can still fail mid-transfer",
+            "near-seamless for running guests — shared disks stay in place, local disks are copied "
+            "only with with_local_disks; can still fail mid-transfer",
             "CANNOT be automatically undone — to revert, migrate back manually",
         ]
         reasons = [
-            "QEMU live migration: designed for zero-downtime but requires shared storage",
+            "QEMU live migration: designed for zero-downtime; RAM (and any local disk) is copied while the guest runs",
             "a failed mid-transfer live migration may leave the guest in an inconsistent state",
         ]
         risk = RISK_MEDIUM
@@ -448,16 +549,28 @@ def plan_migrate(
     complete = True
     if current:
         from .blast import migrate_blast
-        mb = migrate_blast(api, vmid, kind, node, target, online)
+        mb = migrate_blast(api, vmid, kind, node, target, online,
+                           with_local_disks=with_local_disks, targetstorage=targetstorage)
         blast.extend(mb.summary_lines)
         affected = mb.affected
         complete = mb.complete
-        risk = _max_risk(risk, RISK_HIGH if mb.max_severity == "high" else RISK_NONE)
+        risk = _max_risk(risk, {"high": RISK_HIGH, "medium": RISK_MEDIUM}.get(mb.max_severity, RISK_NONE))
+
+    if "bwlimit" in options:
+        limit = options["bwlimit"]
+        blast.append(
+            f"transfer capped at {limit} KiB/s (~{limit / 1024:.0f} MiB/s) — a longer copy window"
+            if limit else "bwlimit=0: no bandwidth cap for this migration (overrides datacenter/storage limits)"
+        )
+    if options.get("migration_type") == "insecure":
+        blast.append("migration_type=insecure: guest RAM and disk data cross the migration network UNENCRYPTED")
+        reasons.append("insecure migration: traffic is not tunnelled over SSH — use only on a trusted network")
+    flags = "".join(f", {k}={v}" for k, v in options.items())
 
     return Plan(
         action="pve_guest_migrate",
         target=f"{kind}/{vmid}->{target}",
-        change=f"migrate {kind} {vmid} from {n} to {target} (online={online})",
+        change=f"migrate {kind} {vmid} from {n} to {target} (online={online}{flags})",
         current=current,
         blast_radius=blast,
         risk=risk,

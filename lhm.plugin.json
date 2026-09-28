@@ -25083,7 +25083,7 @@
     },
     {
       "name": "pve_guest_migrate",
-      "description": "MUTATION: migrate a guest to a different node. Dry-run by default — the PLAN shows the\nguest's live state, the source→target, and the honest blast radius (LXC 'online' is\nstop→move→start, NOT zero-downtime; QEMU live migration requires shared storage).\nconfirm=True to execute. Async — returns a task UPID; poll with pve_task_status. To drive\nthe same move through PDM instead, use pdm_pve_lxc_migrate or pdm_pve_qemu_migrate.",
+      "description": "MUTATION: migrate a guest to a different node. Dry-run by default — the PLAN shows the\nguest's live state, the source→target, and the honest blast radius (LXC 'online' is\nstop→move→start, NOT zero-downtime; a QEMU disk on local storage is copied only with\nwith_local_disks, and the PLAN names and sizes each copy). confirm=True to execute.\nAsync — returns a task UPID; poll with pve_task_status. To drive the same move through PDM\ninstead, use pdm_pve_lxc_migrate or pdm_pve_qemu_migrate.",
       "inputSchema": {
         "properties": {
           "vmid": {
@@ -25109,8 +25109,37 @@
           },
           "online": {
             "default": false,
-            "description": "QEMU: live migration (zero-downtime, needs shared storage). LXC: stop-move-start restart migration (real downtime). False = offline migration.",
+            "description": "QEMU: live migration (the guest keeps running; local disks also need with_local_disks). LXC: stop-move-start restart migration (real downtime). False = offline migration.",
             "type": "boolean"
+          },
+          "with_local_disks": {
+            "default": false,
+            "description": "QEMU only: copy disks on local (non-shared) storage to the target as part of the migration, live or offline. Without it PVE refuses a guest with a local disk.",
+            "type": "boolean"
+          },
+          "targetstorage": {
+            "default": null,
+            "description": "Where copied local disks land on the target: '1' (same storage ID), one storage ID for all, or 'src:dst' pairs comma-separated. QEMU 'targetstorage', LXC 'target-storage'.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bwlimit": {
+            "default": null,
+            "description": "Migration bandwidth cap in KiB/s; 0 = no cap. Omit to use the datacenter/storage default.",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "migration_type": {
+            "default": null,
+            "description": "QEMU only: 'secure' (SSH tunnel) or 'insecure' (unencrypted, trusted networks only). Omit to use the datacenter default.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "confirm": {
             "default": false,

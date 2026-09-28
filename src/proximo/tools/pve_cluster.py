@@ -138,21 +138,28 @@ def pve_guest_migrate(
     target: Annotated[str, Field(description="Destination node name to migrate the guest to.")],
     kind: Annotated[str, Field(description="Guest type: 'lxc' or 'qemu'.")] = "lxc",
     node: Annotated[str | None, Field(description="Source node name; defaults to the configured node.")] = None,
-    online: Annotated[bool, Field(description="QEMU: live migration (zero-downtime, needs shared storage). LXC: stop-move-start restart migration (real downtime). False = offline migration.")] = False,
+    online: Annotated[bool, Field(description="QEMU: live migration (the guest keeps running; local disks also need with_local_disks). LXC: stop-move-start restart migration (real downtime). False = offline migration.")] = False,
+    with_local_disks: Annotated[bool, Field(description="QEMU only: copy disks on local (non-shared) storage to the target as part of the migration, live or offline. Without it PVE refuses a guest with a local disk.")] = False,
+    targetstorage: Annotated[str | None, Field(description="Where copied local disks land on the target: '1' (same storage ID), one storage ID for all, or 'src:dst' pairs comma-separated. QEMU 'targetstorage', LXC 'target-storage'.")] = None,
+    bwlimit: Annotated[int | None, Field(description="Migration bandwidth cap in KiB/s; 0 = no cap. Omit to use the datacenter/storage default.")] = None,
+    migration_type: Annotated[str | None, Field(description="QEMU only: 'secure' (SSH tunnel) or 'insecure' (unencrypted, trusted networks only). Omit to use the datacenter default.")] = None,
     confirm: Annotated[bool, Field(description="False (default) returns a dry-run PLAN only; True executes the migration.")] = False,
 ) -> dict:
     """MUTATION: migrate a guest to a different node. Dry-run by default — the PLAN shows the
     guest's live state, the source→target, and the honest blast radius (LXC 'online' is
-    stop→move→start, NOT zero-downtime; QEMU live migration requires shared storage).
-    confirm=True to execute. Async — returns a task UPID; poll with pve_task_status. To drive
-    the same move through PDM instead, use pdm_pve_lxc_migrate or pdm_pve_qemu_migrate.
+    stop→move→start, NOT zero-downtime; a QEMU disk on local storage is copied only with
+    with_local_disks, and the PLAN names and sizes each copy). confirm=True to execute.
+    Async — returns a task UPID; poll with pve_task_status. To drive the same move through PDM
+    instead, use pdm_pve_lxc_migrate or pdm_pve_qemu_migrate.
     """
     _, api, _, _ = _proximo_server._svc()
     tgt = f"{kind}/{vmid}->{target}"
+    opts = {"with_local_disks": with_local_disks, "targetstorage": targetstorage,
+            "bwlimit": bwlimit, "migration_type": migration_type}
     return run_governed(
         "pve_guest_migrate", tgt,
-        plan=lambda: plan_migrate(api, vmid, target, kind, node, online),
-        execute=lambda: guest_migrate(api, vmid, target, kind, node, online),
+        plan=lambda: plan_migrate(api, vmid, target, kind, node, online, **opts),
+        execute=lambda: guest_migrate(api, vmid, target, kind, node, online, **opts),
         confirm=confirm, outcome="submitted")
 
 

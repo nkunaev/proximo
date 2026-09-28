@@ -516,6 +516,9 @@ def _fallback_value(pname: str, ann: str) -> Any:
 CUSTOM_KWARGS: dict[str, dict[str, Any]] = {
     # the raw door validates `path` against the vendored tree: only a published GET passes
     "proximo_api_get": {"plane": "pve", "path": "/version", "params": None},
+    # migrate_options refuses migration_type / with_local_disks for LXC: exercise every knob on QEMU
+    "pve_guest_migrate": {"kind": "qemu", "with_local_disks": True, "targetstorage": "storage2",
+                          "bwlimit": 1024, "migration_type": "secure"},
     # firewall action is ACCEPT/DROP/REJECT, not a power verb; exercise the guest-scoped path
     # (scope="guest") so vmid/kind actually surface in the change/blast text (_scope_label).
     "pve_firewall_rule_add": {"action": "ACCEPT", "scope": "guest", "vmid": "100", "kind": "lxc"},

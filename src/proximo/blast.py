@@ -17,7 +17,7 @@ import ipaddress
 import re
 from dataclasses import dataclass, field
 
-from .cluster_ops import cluster_resources, ha_resources_list
+from .cluster_ops import cluster_resources, ha_resources_list, parse_storage_map
 from .config_edit import guest_config_get
 from .planning import RISK_HIGH, RISK_MEDIUM, _max_risk
 from .tasks_pools import pool_get, pools_list
@@ -1658,18 +1658,35 @@ class MigrateBlastResult:
     summary_lines: list[str]
     affected: list[dict]
     complete: bool
-    max_severity: str          # "high" | "none" — escalates the plan's base risk, never lowers it
+    max_severity: str          # "high" | "medium" | "none" — escalates the plan's base risk, never lowers it
+
+
+def _disk_size_bytes(volval: str) -> int | None:
+    """Bytes from a disk value's 'size=' option (PVE writes 32G / 512M); None when absent."""
+    from .disk_ops import _parse_size_bytes
+
+    for part in volval.split(","):
+        if part.strip().startswith("size="):
+            return _parse_size_bytes(part.strip()[5:])
+    return None
 
 
 def compute_migrate_blast(target: str, disk_slots: dict, storage_meta: dict,
                           config_complete: bool, online: bool, kind: str,
-                          raw_slots: list[str] | None = None) -> MigrateBlastResult:
+                          raw_slots: list[str] | None = None, *,
+                          with_local_disks: bool = False,
+                          storage_map: tuple[str | None, dict[str, str]] | None = None,
+                          disk_sizes: dict[str, int] | None = None) -> MigrateBlastResult:
     """PURE. Given the guest's {slot: storage} disks and per-storage metadata
     ({storage: {"shared": bool, "nodes": set|None}}; a storage ABSENT from the map = metadata
     unreadable), decide whether each disk can migrate to `target`. A disk is OK (unflagged) ONLY when
     its storage is provably shared AND available on the target; local / unavailable / unknown all flag.
     `raw_slots` are passthrough/raw disks that name no PVE storage — they cannot follow the guest to
-    another node, so each is flagged (never dropped). `config_complete=False` → loud INCOMPLETE, HIGH."""
+    another node, so each is flagged (never dropped). `config_complete=False` → loud INCOMPLETE, HIGH.
+
+    `with_local_disks` (QEMU) turns a local disk from a FAIL into a named COPY (MEDIUM): its landing
+    storage comes from `storage_map` (parse_storage_map of targetstorage; None = same storage ID) and
+    must itself be available on the target. `disk_sizes` {slot: bytes} sizes each copy and the total."""
     lines: list[str] = []
     affected: list[dict] = []
 
@@ -1706,9 +1723,42 @@ def compute_migrate_blast(target: str, disk_slots: dict, storage_meta: dict,
                 f"(restricted to {sorted(nodes)}) — the migration cannot place it"
             )
             continue
+        if not meta.get("shared") and with_local_disks:
+            default, pairs = storage_map or (None, {})
+            dest = pairs.get(storage) or default or storage
+            dmeta = storage_meta.get(dest)
+            size = (disk_sizes or {}).get(slot)
+            sized = f" ({_fmt_bytes(size)})" if size else ""
+            if dmeta is None:
+                complete = False
+                affected.append({"slot": slot, "storage": storage, "state": "unknown", "severity": "unknown",
+                                 "effect": f"target storage {dest!r} config unreadable — cannot confirm disk "
+                                           f"{slot} can land on {target!r}"})
+                lines.append(
+                    f"⚠ INCOMPLETE: disk {slot} would be copied to {dest!r}, whose metadata is unreadable — "
+                    "whether it exists on the target is UNKNOWN (not a safety signal)"
+                )
+            elif dmeta.get("nodes") is not None and target not in dmeta["nodes"]:
+                affected.append({"slot": slot, "storage": storage, "state": "unavailable", "severity": "high",
+                                 "effect": f"target storage {dest!r} is restricted to {sorted(dmeta['nodes'])} "
+                                           f"and is NOT available on {target!r} — cannot place disk {slot}"})
+                lines.append(
+                    f"FAILS: disk {slot} would be copied to {dest!r}, not available on target {target!r} "
+                    f"(restricted to {sorted(dmeta['nodes'])}) — the migration cannot place it"
+                )
+            else:
+                affected.append({"slot": slot, "storage": storage, "state": "copy", "severity": "medium",
+                                 "target_storage": dest, "size_bytes": size,
+                                 "effect": f"disk {slot}{sized} on LOCAL storage {storage!r} is COPIED to "
+                                           f"{dest!r} on {target!r} (with-local-disks); the source volume is "
+                                           "removed only after the migration succeeds"})
+                lines.append(f"COPY: disk {slot}{sized} {storage!r} → {target}:{dest!r} (with-local-disks)")
+            continue
         if not meta.get("shared"):
             live = online and kind == "qemu"
             extra = " a LIVE migration is NOT possible with a local disk" if live else ""
+            if kind == "qemu":
+                extra += " (set with_local_disks=True to copy it)"
             affected.append({"slot": slot, "storage": storage, "state": "local", "severity": "high",
                              "effect": f"disk {slot} is on LOCAL/non-shared storage {storage!r} — migration "
                                        f"must COPY it to the target (needs with-local-disks); a plain "
@@ -1728,8 +1778,19 @@ def compute_migrate_blast(target: str, disk_slots: dict, storage_meta: dict,
             f"RAW DISK: {slot} is a passthrough device (no PVE storage) — it cannot migrate to another node"
         )
 
-    if affected:
+    copies = [a for a in affected if a["state"] == "copy"]
+    if copies:
+        known = [a["size_bytes"] for a in copies if a["size_bytes"]]
+        total = (f" totalling {_fmt_bytes(sum(known))}" if len(known) == len(copies)
+                 else " (size not in config for some)")
+        lines.append(
+            f"{len(copies)} local disk(s){total} are copied over the migration network — the migration "
+            "lasts as long as the copy; a live migration keeps the guest running on the source until the switch"
+        )
+    if any(a["severity"] in ("high", "unknown") for a in affected):
         return MigrateBlastResult(lines, affected, complete=complete, max_severity="high")
+    if affected:
+        return MigrateBlastResult(lines, affected, complete=complete, max_severity="medium")
     if disk_slots:
         lines.append(
             f"all {len(disk_slots)} disk(s) are on shared storage available on target {target!r} — "
@@ -1741,10 +1802,10 @@ def compute_migrate_blast(target: str, disk_slots: dict, storage_meta: dict,
 
 
 def gather_migrate_dependents(api, vmid: str, kind: str, node: str | None,
-                              target: str) -> tuple[dict, list[str], dict, bool]:
-    """I/O, fail-closed. Returns (disk_slots, raw_slots, storage_meta, config_complete):
+                              target: str) -> tuple[dict, list[str], dict, bool, dict]:
+    """I/O, fail-closed. Returns (disk_slots, raw_slots, storage_meta, config_complete, disk_sizes):
     - disk_slots {slot: storage} + raw_slots [slot] (passthrough/no-storage) from the guest config
-      (config_complete=False if unreadable/empty);
+      (config_complete=False if unreadable/empty); disk_sizes {slot: bytes} where 'size=' is present;
     - storage_meta {storage: {"shared": bool, "nodes": set[str]|None}} from the cluster storage.cfg
       (a storage absent from the map / a failed read = metadata unknown for that storage).
     """
@@ -1752,11 +1813,16 @@ def gather_migrate_dependents(api, vmid: str, kind: str, node: str | None,
 
     disk_slots: dict = {}
     raw_slots: list[str] = []
+    disk_sizes: dict = {}
     config_complete = True
     try:
         cfg = guest_config_get(api, vmid, kind, node)
         if isinstance(cfg, dict) and cfg:
             disk_slots, raw_slots = _disk_slots_split(cfg)
+            for slot in disk_slots:
+                size = _disk_size_bytes(str(cfg[slot]))
+                if size:
+                    disk_sizes[slot] = size
         else:
             config_complete = False
     except Exception:
@@ -1774,16 +1840,18 @@ def gather_migrate_dependents(api, vmid: str, kind: str, node: str | None,
             storage_meta[str(name)] = {"shared": shared, "nodes": nodes or None}
     except Exception:
         storage_meta = {}
-    return disk_slots, raw_slots, storage_meta, config_complete
+    return disk_slots, raw_slots, storage_meta, config_complete, disk_sizes
 
 
 def migrate_blast(api, vmid: str, kind: str, node: str | None, target: str,
-                  online: bool) -> MigrateBlastResult:
+                  online: bool, *, with_local_disks: bool = False,
+                  targetstorage: str | None = None) -> MigrateBlastResult:
     """Convenience: gather live state then compute the pure migrate disk-residency result."""
-    disk_slots, raw_slots, storage_meta, config_complete = gather_migrate_dependents(
+    disk_slots, raw_slots, storage_meta, config_complete, disk_sizes = gather_migrate_dependents(
         api, vmid, kind, node, target)
     return compute_migrate_blast(target, disk_slots, storage_meta, config_complete, online, kind,
-                                 raw_slots=raw_slots)
+                                 raw_slots=raw_slots, with_local_disks=with_local_disks,
+                                 storage_map=parse_storage_map(targetstorage), disk_sizes=disk_sizes)
 
 
 # ===========================================================================

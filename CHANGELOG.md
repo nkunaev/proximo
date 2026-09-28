@@ -2,6 +2,11 @@
 
 All notable changes to Proximo. Format loosely follows Keep a Changelog; versions are SemVer.
 
+## [Unreleased]
+
+**Local disks migrate, and the PLAN names each copy.**
+`pve_guest_migrate` gains `with_local_disks`, `targetstorage`, `bwlimit` and `migration_type`, sent under PVE's own names (`with-local-disks`, `targetstorage` / LXC `target-storage`, `bwlimit`, `migration_type`). The disk-residency blast already told the caller a local disk "needs with-local-disks", but no parameter could send it, so a cluster whose guests live on local LVM or ZFS could not migrate through Proximo at all. With the flag, each local disk is a named COPY in `affected` (slot, landing storage, size from the config's `size=`, and a total), MEDIUM rather than HIGH; the landing storage chosen by `targetstorage` must itself be available on the target, or the PLAN says FAILS. `bwlimit` and `migration_type=insecure` are disclosed in the blast radius, the latter with a risk reason. The knobs are validated once, in `migrate_options`, and the PLAN refuses exactly what the execute would: `with_local_disks` and `migration_type` are QEMU-only and refused for LXC rather than dropped. The docstring, the parameter description and the PLAN no longer say QEMU live migration requires shared storage; it does not, it requires the disks to be copied.
+
 ## [0.44.0] — 2026-09-21
 
 **No tool leaks an exception's raw text any more.**
