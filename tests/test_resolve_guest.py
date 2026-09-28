@@ -189,3 +189,23 @@ def test_a_refused_resolution_is_on_the_ledger(tmp_path, monkeypatch):
     assert [(e["action"], e["target"], e["outcome"], e["mutation"], e["detail"]["phase"]) for e in entries] == [
         ("pve_guest_config_get", "guest/300", "error", False, "resolve"),
     ]
+
+
+def test_firewall_guest_rule_add_without_kind_or_node_posts_to_the_real_guest(tmp_path, monkeypatch):
+    api = _Api()
+    _wire(tmp_path, monkeypatch, api)
+
+    out = server.pve_firewall_rule_add(action="ACCEPT", scope="guest", vmid="300", proto="tcp",
+                                       dport="22", confirm=True)
+
+    assert out["status"] == "ok"
+    assert api.posts[-1][0] == "/nodes/pve2/qemu/300/firewall/rules"
+
+
+def test_ct_diagnose_without_node_reads_the_container_where_it_is(tmp_path, monkeypatch):
+    api = _Api()
+    _wire(tmp_path, monkeypatch, api)
+
+    server.ct_diagnose(ctid="200")
+
+    assert "/nodes/pve3/lxc/200/status/current" in api.gets

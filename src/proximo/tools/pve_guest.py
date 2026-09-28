@@ -301,6 +301,7 @@ def ct_diagnose(
     evidence use pve_diagnose."""
     cfg, api, exec_, _ = _proximo_server._svc()
     ctid = _check_vmid(ctid)  # L07: validate CTID at server layer before the allowlist gate / ledger target
+    kind, node = _resolve_guest("ct_diagnose", api, ctid, kind, node, mutation=False)
     target = f"{kind}/{ctid}"
     if cfg.enable_exec and not cfg.ct_permitted(ctid):
         return _blocked_allowlist("ct_diagnose", str(ctid), cfg=cfg, mutation=False)
