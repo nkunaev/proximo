@@ -444,8 +444,8 @@ This is a one-off run; for a recurring schedule use pve_backup_job_create instea
 | `storage` | string | yes | Storage ID to write the backup archive to. |
 | `mode` | string | no | Backup mode: snapshot (online, brief) \| suspend (RAM-quiesced pause) \| stop (HALTS the guest). (default: `"snapshot"`) |
 | `compress` | string | no | Compression algorithm for the archive, e.g. zstd, gzip, lzo, or 0 (no compression). (default: `"zstd"`) |
-| `kind` | string | no | Guest type: lxc or qemu. (default: `"lxc"`) |
-| `node` | string (nullable) | no | Proxmox node hosting the guest; defaults to the configured node if omitted. (default: `null`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
+| `node` | string (nullable) | no | Proxmox node hosting the guest. Omit to resolve it automatically from the cluster. (default: `null`) |
 | `confirm` | boolean | no | Gate: false returns a dry-run PLAN, true executes the backup. (default: `false`) |
 
 #### `pve_backup_delete`
@@ -1322,7 +1322,7 @@ on a full clone). To create a guest from scratch instead use pve_create_vm / pve
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric ID of the source guest to clone — VMID for a QEMU VM or CTID for an LXC container. |
 | `newid` | string | yes | Numeric ID to assign to the new cloned guest. |
-| `kind` | string | no | Guest type: `lxc` for a container or `qemu` for a VM. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `node` | string (nullable) | no | PVE node the source guest runs on. Omit to resolve it automatically from the cluster. (default: `null`) |
 | `name` | string (nullable) | no | Name to give the new cloned guest. (default: `null`) |
 | `full` | boolean | no | If true, make a full independent copy of the disks; if false (default), make a space-saving linked clone. (default: `false`) |
@@ -1424,7 +1424,7 @@ pve_task_status. No undo once confirmed.
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric ID of the guest to destroy — VMID for a QEMU VM or CTID for an LXC container. |
-| `kind` | string | no | Guest type: `lxc` for a container or `qemu` for a VM. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `node` | string (nullable) | no | PVE node the guest runs on. Omit to resolve it automatically from the cluster. (default: `null`) |
 | `purge` | boolean | no | If true, also remove the guest from replication/backup jobs and HA resources referencing it. (default: `false`) |
 | `force` | boolean | no | Force removal even if the guest is still running or the backend reports an inconsistent state. (default: `false`) |
@@ -1455,7 +1455,7 @@ grow a disk in place instead of relocating it use pve_disk_resize.
 | `vmid` | string | yes | Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container. |
 | `disk` | string | yes | Disk key to move, e.g. `scsi0` or `rootfs`. |
 | `target_storage` | string | yes | Storage backend name to move the disk to. |
-| `kind` | string | no | Guest type: `lxc` for a container or `qemu` for a VM. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `node` | string (nullable) | no | PVE node the guest runs on. Omit to resolve it automatically from the cluster. (default: `null`) |
 | `delete_source` | boolean | no | If true, delete the source copy after the move (HIGH risk); if false (default), keep it. (default: `false`) |
 | `confirm` | boolean | no | Leave `false` (default) to get a dry-run PLAN; set `true` to execute the move. (default: `false`) |
@@ -1472,7 +1472,7 @@ verified first. Dry-run by default; confirm=True to execute. Async — returns a
 | `vmid` | string | yes | Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container. |
 | `disk` | string | yes | Disk key to resize, e.g. `scsi0` or `rootfs`. |
 | `size` | string | yes | New size, as a grow-only delta like `+10G` (shrinking is refused as destructive). |
-| `kind` | string | no | Guest type: `lxc` for a container or `qemu` for a VM. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `node` | string (nullable) | no | PVE node the guest runs on. Omit to resolve it automatically from the cluster. (default: `null`) |
 | `confirm` | boolean | no | Leave `false` (default) to get a dry-run PLAN; set `true` to execute the resize. (default: `false`) |
 
@@ -1909,7 +1909,7 @@ pve_guest_config_revert.
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container. |
-| `kind` | string | no | Guest type: `lxc` for a container or `qemu` for a VM. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `node` | string (nullable) | no | PVE node the guest runs on. Omit to resolve it automatically from the cluster. (default: `null`) |
 
 #### `pve_guest_config_revert`
@@ -1923,7 +1923,7 @@ silently skipped rather than rejected.
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container. |
 | `prior_config` | object | yes | The prior config dict previously returned by pve_guest_config_set, to re-apply. |
-| `kind` | string | no | Guest type: `lxc` for a container or `qemu` for a VM. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `node` | string (nullable) | no | PVE node the guest runs on. Omit to resolve it automatically from the cluster. (default: `null`) |
 | `confirm` | boolean | no | Leave `false` (default) to get a dry-run PLAN; set `true` to execute the revert. (default: `false`) |
 
@@ -1938,7 +1938,7 @@ pve_guest_config_revert.
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container. |
 | `changes` | object | yes | Config keys to change, e.g. {'cores': 4, 'memory': 2048, 'onboot': 1}. |
-| `kind` | string | no | Guest type: `lxc` for a container or `qemu` for a VM. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `node` | string (nullable) | no | PVE node the guest runs on. Omit to resolve it automatically from the cluster. (default: `null`) |
 | `confirm` | boolean | no | Leave `false` (default) to get a dry-run PLAN with the per-key diff; set `true` to execute. (default: `false`) |
 
@@ -1955,8 +1955,8 @@ instead, use pdm_pve_lxc_migrate or pdm_pve_qemu_migrate.
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric VMID/CTID of the guest to migrate. |
 | `target` | string | yes | Destination node name to migrate the guest to. |
-| `kind` | string | no | Guest type: 'lxc' or 'qemu'. (default: `"lxc"`) |
-| `node` | string (nullable) | no | Source node name; defaults to the configured node. (default: `null`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
+| `node` | string (nullable) | no | Source node name. Omit to resolve it automatically from the cluster. (default: `null`) |
 | `online` | boolean | no | QEMU: live migration (the guest keeps running; local disks also need with_local_disks). LXC: stop-move-start restart migration (real downtime). False = offline migration. (default: `false`) |
 | `with_local_disks` | boolean | no | QEMU only: copy disks on local (non-shared) storage to the target as part of the migration, live or offline. Without it PVE refuses a guest with a local disk. (default: `false`) |
 | `targetstorage` | string (nullable) | no | Where copied local disks land on the target: '1' (same storage ID), one storage ID for all, or 'src:dst' pairs comma-separated. QEMU 'targetstorage', LXC 'target-storage'. (default: `null`) |
@@ -1994,7 +1994,7 @@ and returns the task UPID — poll it with pve_task_status.
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container. |
 | `action` | string | yes | Power action to perform: `start`, `stop`, `reboot`, or `shutdown`. |
-| `kind` | string | no | Guest type: `lxc` for a container or `qemu` for a VM. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `node` | string (nullable) | no | PVE node the guest runs on. Omit to resolve it automatically from the cluster. (default: `null`) |
 | `confirm` | boolean | no | Leave `false` (default) to get a dry-run PLAN with blast radius; set `true` to execute the action. (default: `false`) |
 
@@ -2008,7 +2008,7 @@ Use pve_guest_config_get for the full configuration.
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container. |
-| `kind` | string | no | Guest type: `lxc` for a container or `qemu` for a VM. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `node` | string (nullable) | no | PVE node the guest runs on. Omit to resolve it automatically from the cluster. (default: `null`) |
 
 #### `pve_ha_groups_list`
@@ -2030,7 +2030,7 @@ typically returns null, not a UPID. To remove HA management use pve_ha_resource_
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric VMID/CTID of the guest to add to HA management. |
-| `kind` | string | no | Guest type: 'lxc' or 'qemu'. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `group` | string (nullable) | no | HA group to assign (PVE 8 only; PVE 9 removed groups in favor of HA rules — omit on PVE 9). (default: `null`) |
 | `state` | string (nullable) | no | Desired HA state, e.g. 'started', 'stopped', 'disabled' ('stopped' has the CRM stop the guest). (default: `null`) |
 | `max_restart` | integer (nullable) | no | Max number of restart attempts the CRM makes before giving up. (default: `null`) |
@@ -2047,7 +2047,7 @@ UPID. To re-add HA management use pve_ha_resource_add.
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric VMID/CTID of the guest to remove from HA management. |
-| `kind` | string | no | Guest type: 'lxc' or 'qemu'. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `confirm` | boolean | no | False (default) returns a dry-run PLAN only; True executes the change. (default: `false`) |
 
 #### `pve_ha_resources_list`
@@ -3177,7 +3177,7 @@ pve_snapshot_create.
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container. |
 | `snapname` | string | yes | Name of the snapshot to roll the guest back to. |
-| `kind` | string | no | Guest type: `lxc` for a container or `qemu` for a VM. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `node` | string (nullable) | no | PVE node the guest runs on. Omit to resolve it automatically from the cluster. (default: `null`) |
 | `confirm` | boolean | no | Leave `false` (default) to get a dry-run PLAN with blast radius; set `true` to execute the rollback. (default: `false`) |
 
@@ -4466,7 +4466,7 @@ use pve_snapshot_list.
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container. |
 | `snapname` | string | yes | Name for the new snapshot. |
-| `kind` | string | no | Guest type: `lxc` for a container or `qemu` for a VM. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `node` | string (nullable) | no | PVE node the guest runs on. Omit to resolve it automatically from the cluster. (default: `null`) |
 | `description` | string (nullable) | no | Optional free-text description stored on the snapshot. (default: `null`) |
 | `confirm` | boolean | no | Leave `false` (default) to get a dry-run PLAN; set `true` to execute the snapshot creation. (default: `false`) |
@@ -4481,7 +4481,7 @@ pve_task_status. To create a snapshot instead of removing one use pve_snapshot_c
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container. |
 | `snapname` | string | yes | Name of the snapshot to delete. |
-| `kind` | string | no | Guest type: `lxc` for a container or `qemu` for a VM. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `node` | string (nullable) | no | PVE node the guest runs on. Omit to resolve it automatically from the cluster. (default: `null`) |
 | `force` | boolean | no | Force removal even if the snapshot has children or the backend reports an inconsistent state. (default: `false`) |
 | `confirm` | boolean | no | Leave `false` (default) to get a dry-run PLAN; set `true` to execute the deletion. (default: `false`) |
@@ -4495,7 +4495,7 @@ and containers (kind='qemu' or 'lxc'). Use pve_snapshot_create / pve_rollback to
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `vmid` | string | yes | Numeric ID of the guest — VMID for a QEMU VM or CTID for an LXC container. |
-| `kind` | string | no | Guest type: `lxc` for a container or `qemu` for a VM. (default: `"lxc"`) |
+| `kind` | string (nullable) | no | Guest type: `lxc` or `qemu`. Omit to detect it from the cluster. (default: `null`) |
 | `node` | string (nullable) | no | PVE node the guest runs on. Omit to resolve it automatically from the cluster. (default: `null`) |
 
 #### `pve_storage_config_get`
