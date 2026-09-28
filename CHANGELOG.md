@@ -5,7 +5,7 @@ All notable changes to Proximo. Format loosely follows Keep a Changelog; version
 ## [Unreleased]
 
 **PVE's own answer on where a guest may migrate.**
-`pve_guest_migrate_preflight(vmid, kind, node, target)` reads `GET /nodes/{node}/{kind}/{vmid}/migrate` and returns it as PVE sends it: `allowed_nodes`, `not_allowed_nodes` with the reason (unavailable storages, missing mappings), `local_disks`, `local_resources` and `running`. The `pve_guest_migrate` PLAN estimates disk residency from storage.cfg; this is the verdict PVE itself computes, the same one that refuses the migrate. PVE gates the read behind `VM.Migrate` on the guest, not `VM.Audit`, so a read-only token gets 403 on it, and the description says so. Classified adversarial in the taint model, like `pve_storage_content`: volids and local ISO names are free text chosen by whoever uploaded them. 925 tools.
+`pve_guest_migrate_preflight(vmid, kind, node, target)` reads `GET /nodes/{node}/{kind}/{vmid}/migrate` and returns it as PVE sends it: `allowed_nodes`, `not_allowed_nodes` with the reason (unavailable storages, missing mappings), `local_disks`, `local_resources` and `running`. The `pve_guest_migrate` PLAN estimates disk residency from storage.cfg; this is the verdict PVE itself computes, the same one that refuses the migrate. PVE gates the read behind `VM.Migrate` on the guest, not `VM.Audit`, so a read-only token gets 403 on it, and the description says so. Classified adversarial in the taint model, like `pve_storage_content`: volids and local ISO names are free text chosen by whoever uploaded them. The `safe_migration` prompt calls it as step 2, before the dry-run plan. 925 tools.
 
 ## [0.44.0] — 2026-09-21
 

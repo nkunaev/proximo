@@ -66,6 +66,8 @@ def test_safe_migration_plans_before_moving_and_verifies():
     low = text.lower()
     assert "plan" in low and "before" in low
     assert "pve_guest_status" in text
+    # PVE's own precondition verdict comes before the Proximo plan
+    assert text.index("pve_guest_migrate_preflight") < text.index("call `pve_guest_migrate` for")
 
 
 def test_diagnose_cluster_is_read_only():
