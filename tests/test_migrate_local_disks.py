@@ -239,3 +239,30 @@ def test_blast_total_is_withheld_when_a_size_is_missing():
 def test_disk_size_bytes(value, expected):
     assert _disk_size_bytes(value) == expected
 
+
+
+def test_blast_lxc_local_volume_is_a_copy_without_a_flag():
+    """pct migrate moves local volumes itself: an LXC local disk is a COPY, not a FAIL."""
+    r = compute_migrate_blast("pveB", {"rootfs": "local-lvm"}, {"local-lvm": _meta(shared=False)},
+                              config_complete=True, online=True, kind="lxc",
+                              disk_sizes={"rootfs": 8 * 1024 ** 3})
+    assert r.max_severity == "medium"
+    assert r.affected[0]["state"] == "copy"
+    assert "LXC storage migration" in r.affected[0]["effect"]
+    assert not any("FAILS" in line for line in r.summary_lines)
+
+
+def test_blast_lxc_target_storage_must_exist_on_target():
+    r = compute_migrate_blast("pveB", {"rootfs": "local-lvm"},
+                              {"local-lvm": _meta(shared=False), "fast": _meta(False, nodes={"pveA"})},
+                              config_complete=True, online=False, kind="lxc", storage_map=("fast", {}))
+    assert r.max_severity == "high"
+    assert r.affected[0]["state"] == "unavailable"
+
+
+def test_plan_lxc_restart_migration_with_local_rootfs_names_the_copy():
+    api = _LocalDiskApi(config={"rootfs": "local-lvm:vm-200-disk-0,size=8G"})
+    p = plan_migrate(api, "200", "pve2", kind="lxc", online=True, targetstorage="local-lvm")
+    assert p.risk == RISK_HIGH  # restart migration = real downtime, whatever the disks do
+    assert [a["state"] for a in p.affected] == ["copy"]
+    assert "target-storage=local-lvm" in p.change

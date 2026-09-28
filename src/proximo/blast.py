@@ -1684,9 +1684,10 @@ def compute_migrate_blast(target: str, disk_slots: dict, storage_meta: dict,
     `raw_slots` are passthrough/raw disks that name no PVE storage — they cannot follow the guest to
     another node, so each is flagged (never dropped). `config_complete=False` → loud INCOMPLETE, HIGH.
 
-    `with_local_disks` (QEMU) turns a local disk from a FAIL into a named COPY (MEDIUM): its landing
-    storage comes from `storage_map` (parse_storage_map of targetstorage; None = same storage ID) and
-    must itself be available on the target. `disk_sizes` {slot: bytes} sizes each copy and the total."""
+    `with_local_disks` (QEMU) turns a local disk from a FAIL into a named COPY (MEDIUM); an LXC
+    migration copies local volumes without a flag, so for LXC a local disk is always a COPY. The
+    landing storage comes from `storage_map` (parse_storage_map of targetstorage; None = same storage
+    ID) and must itself be available on the target. `disk_sizes` {slot: bytes} sizes each copy."""
     lines: list[str] = []
     affected: list[dict] = []
 
@@ -1700,6 +1701,8 @@ def compute_migrate_blast(target: str, disk_slots: dict, storage_meta: dict,
         return MigrateBlastResult(lines, affected, complete=False, max_severity="high")
 
     complete = True
+    copies_local = with_local_disks or kind == "lxc"
+    via = "with-local-disks" if kind == "qemu" else "LXC storage migration"
     for slot in sorted(disk_slots):
         storage = disk_slots[slot]
         meta = storage_meta.get(storage)
@@ -1723,7 +1726,7 @@ def compute_migrate_blast(target: str, disk_slots: dict, storage_meta: dict,
                 f"(restricted to {sorted(nodes)}) — the migration cannot place it"
             )
             continue
-        if not meta.get("shared") and with_local_disks:
+        if not meta.get("shared") and copies_local:
             default, pairs = storage_map or (None, {})
             dest = pairs.get(storage) or default or storage
             dmeta = storage_meta.get(dest)
@@ -1750,15 +1753,13 @@ def compute_migrate_blast(target: str, disk_slots: dict, storage_meta: dict,
                 affected.append({"slot": slot, "storage": storage, "state": "copy", "severity": "medium",
                                  "target_storage": dest, "size_bytes": size,
                                  "effect": f"disk {slot}{sized} on LOCAL storage {storage!r} is COPIED to "
-                                           f"{dest!r} on {target!r} (with-local-disks); the source volume is "
+                                           f"{dest!r} on {target!r} ({via}); the source volume is "
                                            "removed only after the migration succeeds"})
-                lines.append(f"COPY: disk {slot}{sized} {storage!r} → {target}:{dest!r} (with-local-disks)")
+                lines.append(f"COPY: disk {slot}{sized} {storage!r} → {target}:{dest!r} ({via})")
             continue
         if not meta.get("shared"):
-            live = online and kind == "qemu"
-            extra = " a LIVE migration is NOT possible with a local disk" if live else ""
-            if kind == "qemu":
-                extra += " (set with_local_disks=True to copy it)"
+            extra = " a LIVE migration is NOT possible with a local disk" if online else ""
+            extra += " (set with_local_disks=True to copy it)"
             affected.append({"slot": slot, "storage": storage, "state": "local", "severity": "high",
                              "effect": f"disk {slot} is on LOCAL/non-shared storage {storage!r} — migration "
                                        f"must COPY it to the target (needs with-local-disks); a plain "
