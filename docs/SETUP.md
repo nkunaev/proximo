@@ -368,7 +368,7 @@ that flip is itself a witnessed `reach_grant` change.
 
 ## Fitting a smaller model — scoping the tool surface
 
-Proximo serves 924 tools, and **the default door is small**: with nothing configured,
+Proximo serves 925 tools, and **the default door is small**: with nothing configured,
 the server serves the dynamic facade — search, schema, read, call, recall and the audit
 trail (~1,740 tokens) — with everything this box serves still callable through it. That is the 0.30
 flip, and the reason is measured: the catalog doors below cost your model context at

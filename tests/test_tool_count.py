@@ -33,7 +33,9 @@ from pathlib import Path
 import proximo.door as door
 import proximo.server as server
 
-EXPECTED_TOOL_COUNT = 924  # +11 (PDM identity core, 2026-09-19): pdm_user_get/create/update/delete,
+EXPECTED_TOOL_COUNT = 925  # +1 (migrate precondition): pve_guest_migrate_preflight, PVE's own
+# verdict on where a guest may migrate. Before that 924: +11 (PDM identity core, 2026-09-19):
+# pdm_user_get/create/update/delete,
 # pdm_user_tokens_list, pdm_user_token_get, pdm_token_create/update/delete, pdm_acl_update,
 # pdm_permissions_get. Before that 913: +1 (the raw GET door, 2026-09-19): proximo_api_get, any published
 # read on any plane, validated against the vendored tree, gated reads refused. Before that 912:

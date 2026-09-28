@@ -2896,6 +2896,7 @@ from proximo.tools.pve_cluster import (  # noqa: E402,F401
     pve_cluster_resources,
     pve_cluster_status,
     pve_guest_migrate,
+    pve_guest_migrate_preflight,
     pve_ha_groups_list,
     pve_ha_resource_add,
     pve_ha_resource_remove,

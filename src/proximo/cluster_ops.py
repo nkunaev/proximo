@@ -197,6 +197,30 @@ def ha_resources_list(api) -> list[dict]:
     return api._get("/cluster/ha/resources") or []
 
 
+def guest_migrate_preflight(
+    api,
+    vmid: str,
+    kind: str = "lxc",
+    node: str | None = None,
+    target: str | None = None,
+) -> dict:
+    """PVE's own verdict on migrating a guest, before anything moves.
+
+    GET /nodes/{node}/{kind}/{vmid}/migrate[?target=<node>]
+    QEMU returns {running, allowed_nodes, not_allowed_nodes, local_disks, local_resources, ...};
+    LXC returns {running, allowed-nodes, not-allowed-nodes} (PVE 9). Returned as PVE sends it.
+
+    PVE gates this read behind VM.Migrate on /vms/{vmid}, not VM.Audit: a read-only token
+    gets 403 here even though nothing changes.
+    """
+    vmid = _check_vmid(vmid)
+    kind = _check_kind(kind)
+    _check_node(node)
+    n = node or api.config.node
+    q = f"?target={_check_target_node(target)}" if target is not None else ""
+    return api._get(f"/nodes/{n}/{kind}/{vmid}/migrate{q}") or {}
+
+
 # ---------------------------------------------------------------------------
 # MUTATION operations — each is confirm-gated + plan-first at the server layer
 # ---------------------------------------------------------------------------

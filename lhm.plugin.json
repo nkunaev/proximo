@@ -25082,6 +25082,43 @@
       }
     },
     {
+      "name": "pve_guest_migrate_preflight",
+      "description": "READ-ONLY: Proxmox's own migration precondition for a guest: which nodes it may go to\n(allowed_nodes / not_allowed_nodes, with the reason, e.g. unavailable storages), its local\ndisks and local resources (passthrough, local ISO, ...), and whether it is running.\n\nNo state change. The PVE-computed answer that pve_guest_migrate's PLAN estimates from\nstorage.cfg; call it before a migrate to see the same refusal PVE would give. Needs\nVM.Migrate on the guest (PVE gates this read behind it; a VM.Audit-only token gets 403).",
+      "inputSchema": {
+        "properties": {
+          "vmid": {
+            "description": "Numeric VMID/CTID of the guest to check.",
+            "type": "string"
+          },
+          "kind": {
+            "default": "lxc",
+            "description": "Guest type: 'lxc' or 'qemu'.",
+            "type": "string"
+          },
+          "node": {
+            "default": null,
+            "description": "Node the guest is on; defaults to the configured node.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "default": null,
+            "description": "Destination node to check against. Omit for the verdict on every node.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "vmid"
+        ],
+        "type": "object"
+      }
+    },
+    {
       "name": "pve_guest_migrate",
       "description": "MUTATION: migrate a guest to a different node. Dry-run by default — the PLAN shows the\nguest's live state, the source→target, and the honest blast radius (LXC 'online' is\nstop→move→start, NOT zero-downtime; QEMU live migration requires shared storage).\nconfirm=True to execute. Async — returns a task UPID; poll with pve_task_status. To drive\nthe same move through PDM instead, use pdm_pve_lxc_migrate or pdm_pve_qemu_migrate.",
       "inputSchema": {

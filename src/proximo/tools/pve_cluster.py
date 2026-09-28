@@ -15,6 +15,7 @@ from proximo.cluster_ops import (
     cluster_resources,
     cluster_status,
     guest_migrate,
+    guest_migrate_preflight,
     ha_groups_list,
     ha_resource_add,
     ha_resource_remove,
@@ -128,6 +129,26 @@ def pve_ha_resources_list() -> dict:
     rows = _audited("pve_ha_resources_list", "cluster/ha/resources",
                     lambda: ha_resources_list(api))
     return envelope_rows(rows, rows, "resources", "state")
+
+
+@tool()
+def pve_guest_migrate_preflight(
+    vmid: Annotated[str, Field(description="Numeric VMID/CTID of the guest to check.")],
+    kind: Annotated[str, Field(description="Guest type: 'lxc' or 'qemu'.")] = "lxc",
+    node: Annotated[str | None, Field(description="Node the guest is on; defaults to the configured node.")] = None,
+    target: Annotated[str | None, Field(description="Destination node to check against. Omit for the verdict on every node.")] = None,
+) -> dict:
+    """READ-ONLY: Proxmox's own migration precondition for a guest: which nodes it may go to
+    (allowed_nodes / not_allowed_nodes, with the reason, e.g. unavailable storages), its local
+    disks and local resources (passthrough, local ISO, ...), and whether it is running.
+
+    No state change. The PVE-computed answer that pve_guest_migrate's PLAN estimates from
+    storage.cfg; call it before a migrate to see the same refusal PVE would give. Needs
+    VM.Migrate on the guest (PVE gates this read behind it; a VM.Audit-only token gets 403).
+    """
+    _, api, _, _ = _proximo_server._svc()
+    return _audited("pve_guest_migrate_preflight", f"{kind}/{vmid}",
+                    lambda: guest_migrate_preflight(api, vmid, kind, node, target))
 
 
 # --- Cluster & HA (REST API, MUTATION — confirm-gated) ---
